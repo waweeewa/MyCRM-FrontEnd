@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const mainCall = "https://localhost:5001/pis/";
+const mainCall = "https://localhost:44310/pis/";
 
 export function GetPartners(){
     return axios.get(mainCall + "Users");
