@@ -70,7 +70,7 @@ export default {
         },
         yearRange: {
             type: Object,
-            default: () => ({ start: 2023, end: 2028 }),
+            default: () => ({ start: 2020, end: 2030 }),
         },
     },
     setup(props, { emit }) {
@@ -175,9 +175,19 @@ export default {
                 // Check if any device has an empty value under "Power Usage" when addEdit is "Add"
                 if (props.addEdit === 'Add') {
                     isSaveDisabled.value = devices.value.some(device => device.input2);
-                }
-                if(isSaveDisabled.value) {
-                    toast.error('You are unable to create invoice for this device because this invoice already exists.', {
+                    if ((isSaveDisabled.value == false && invoiceResponseLastMonth.data.result.usedPower < 0)||(isSaveDisabled.value == false && invoiceResponseLastMonth.data.result.devices.length == 0)) {
+                        isSaveDisabled.value = true;
+                        toast.error("You are unable to create invoice for this device because the invoice for one of the previous months", {
+                        position: toast.POSITION.TOP_CENTER,
+                        autoClose: 10000,
+                        hideProgressBar: false,
+                        closeOnClick: true,
+                        pauseOnHover: true,
+                        draggable: true,
+                    });
+                    }
+                    else if (isSaveDisabled.value) {
+                        toast.error('You are unable to create invoice for this device because this invoice already exists.', {
                         position: toast.POSITION.TOP_CENTER,
                         autoClose: 5000,
                         hideProgressBar: false,
@@ -185,6 +195,8 @@ export default {
                         pauseOnHover: true,
                         draggable: true,
                     });
+                    }
+                    console.log('isSaveDisabled:', isSaveDisabled.value);
                 }
             }
         }
@@ -219,7 +231,6 @@ export default {
                 // Use 0 as default if field is empty
                 const enteredValue = enteredPaidAmount.value === '' ? 0 : parseFloat(enteredPaidAmount.value);
                 const totalPaidAmount = enteredValue + parseFloat(props.tariffData.paidAmount);
-                
                 if (isNaN(enteredValue)) {
                     const errorMessage = `The paid amount (${enteredPaidAmount.value}) must be a valid number. Please check and update the values.`;
                     toast.error(errorMessage, {
@@ -231,7 +242,7 @@ export default {
                         draggable: true,
                     });
                     return;
-                } else if (enteredValue < 0) {
+                } else if (enteredValue <= 0) {
                     const errorMessage = `The paid amount (${enteredPaidAmount.value}) cannot be negative. Please check and update the values.`;
                     toast.error(errorMessage, {
                         position: toast.POSITION.TOP_CENTER,

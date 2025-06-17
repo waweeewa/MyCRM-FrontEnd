@@ -191,7 +191,10 @@ formatDate(dateString) {
   align-items: center;
   margin-bottom: 10px;
 }
-
+.email-autocomplete {
+  width: 200px;
+  margin-right: 2px;
+}
 
 .p-autocomplete-panel {
   width: 400px !important;
@@ -207,5 +210,8 @@ formatDate(dateString) {
 
 .actions-container {
   transform: translateX(-100px);
+}
+.mr-2 {
+  margin-right: 0.5rem;
 }
 </style>

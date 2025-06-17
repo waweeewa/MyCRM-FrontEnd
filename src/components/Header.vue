@@ -7,7 +7,7 @@
       <Button icon="pi pi-bars" @click="toggleMenu" class="custom-button" />
     </div>
   </header>
-  <Dialog v-model:visible="displayModal" :style="{ width: '850px' }">
+  <Dialog v-model:visible="displayModal" :style="{ width: '850px' }" :closable="true" :modal="true" draggable={false}>
     <UserModal :currentUserData="user" @close="displayModal = false" addEdit="Edit"/>
   </Dialog>
   <Dialog v-model:visible="reportModalVisible" :style="{ width: '850px' }" draggable={false}>

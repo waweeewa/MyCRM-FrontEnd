@@ -2,18 +2,18 @@
     <div class="modalUser">
         <div class="userData" style="margin-bottom: 20px">
             <div class="leftInput">
-                <InputText id="firstname" v-model="userData.firstname" placeholder="First Name" />
+                <InputText id="firstname" v-model="userData.firstname" placeholder="First Name" required />
             </div>
             <div class="middleInput">
-                <InputText id="lastname" v-model="userData.lastname" placeholder="Last name" />
+                <InputText id="lastname" v-model="userData.lastname" placeholder="Last name"required />
             </div>
             <div class="rightInput">
-                <InputText id="email" v-model="userData.email" placeholder="E-mail" />
+                <InputText id="email" v-model="userData.email" placeholder="E-mail" required/>
             </div>
         </div>
         <div class="userData" style="margin-bottom: 20px">
             <div class="leftInput">
-                <InputText id="password" v-model="userData.password" placeholder="Password" />
+                <InputText id="password" v-model="userData.password" placeholder="Password" type="password" required />
             </div>
             <div class="middleInput">
                 <InputText id="address" v-model="userData.address" placeholder="Address" />
@@ -35,7 +35,13 @@
         </div>
         <div class="userData" style="margin-bottom: 20px">
             <div class="leftInput">
-                <Dropdown id="tariff" v-model="userData.tarriff" :options="tariffs" optionLabel="label" optionValue="value" placeholder="Select a tariff"/>
+                <Dropdown id="tariff"
+                          v-model="userData.tarriff"
+                          :options="tariffs"
+                          optionLabel="label"
+                          optionValue="value"
+                          placeholder="Select a tariff"
+                          required />
             </div>
             <div class="rightInput">
                 <label for="admincheck" style="font-size:20px; margin-right: 10px; margin-left: 5px;">Admin</label>
@@ -44,7 +50,12 @@
         </div>
         <div class="modalActions">
             <Button label="Cancel" @click="cancel" class="p-button-text" />
-            <Button label="Save" @click="save" class="p-button-success" />
+            <Button 
+                label="Save" 
+                @click="save" 
+                class="p-button-success" 
+                :disabled="isSaveDisabled" 
+            />
         </div>
     </div>
 </template>
@@ -93,6 +104,16 @@ export default {
         isEmailMatched() {
             const storedEmail = localStorage.getItem('email');
             return this.currentUserData.email === storedEmail;
+        },
+        // disable save until all required fields are non-empty
+        isSaveDisabled() {
+            return !(
+                this.userData.firstname &&
+                this.userData.lastname &&
+                this.userData.email &&
+                this.userData.password &&
+                this.userData.tarriff
+            );
         }
     },
     setup(props, { emit }) {
@@ -118,12 +139,26 @@ export default {
                 admincheck: 0,
             },
             admincheck: false,
-            tariffs: [] // Define tariffs in data
+            tariffs: []
         };
     },
     methods: {
         async fetchUser() {
             this.userData = this.currentUserData;
+            
+            // Format birthdate correctly if it exists and we're in edit mode
+            if (this.userData.birthdate && this.addEdit === 'Edit') {
+                const parts = this.userData.birthdate.split('-');
+                if (parts.length === 3) {
+                    // Convert from yyyy-mm-dd to a Date object
+                    this.userData.birthdate = new Date(
+                        parseInt(parts[0]), 
+                        parseInt(parts[1]) - 1,
+                        parseInt(parts[2])
+                    );
+                }
+            }
+            
             this.admincheck = this.userData.admincheck === 1;
         },
         async fetchTariffs() {

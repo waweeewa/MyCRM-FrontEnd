@@ -4,19 +4,39 @@
     <div :class="{'content': !displayModal}" style="margin-left: 100px">
       <Header />
       <NavBar />
-      <Button label="Add" icon="pi pi-plus" @click="onAdd" class="mb-2" style="overflow-y: auto; margin-top: 300px"/>
-        <Calendar style="margin-left: 10px;" v-model="selectedYear" view="year" dateFormat="yy" placeholder="Select Year" class="mb-2" @change="applyFilters" />
-        <Calendar style="margin-left: 10px;" v-model="selectedMonth" view="month" dateFormat="mm" placeholder="Select Month" class="mb-2" @change="applyFilters" />
-        <InputText :hidden="!isAdmin.value" style="margin-left: 10px;" v-model="selectedEmail" placeholder="Type Email" class="mb-2" @input="applyFilters" />
+      <div class="filter-bar">
+        <Button label="Add" icon="pi pi-plus" @click="onAdd" class="mr-2" />
+        <Calendar v-model="selectedYear" view="year" dateFormat="yy" placeholder="Select Year" class="filter-item" @change="applyFilters" />
+        <Calendar v-model="selectedMonth" view="month" dateFormat="mm" placeholder="Select Month" class="filter-item" @change="applyFilters" />
+        <Dropdown 
+          v-if="isAdmin" 
+          v-model="selectedEmail" 
+          :options="emailOptions" 
+          optionLabel="name" 
+          optionValue="value" 
+          placeholder="All Emails"
+          class="filter-item" 
+          @change="applyFilters" />
+      </div>
       <div class="datatable-background">
-        <DataTable :value="filteredTariffs" class="custom-datatable" paginator rows="10">
+        <DataTable 
+          :value="filteredTariffs" 
+          class="custom-datatable" 
+          :paginator="true" 
+          :rows="12" 
+          :dataKey="'id'"
+          paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
+          currentPageReportTemplate="{first} to {last} of {totalRecords}"
+          responsiveLayout="scroll"
+          :rowClass="getRowClass"
+        >
           <Column field="email" header="E-mail" class="wide-column"></Column>
           <Column field="month" header="Month" style="min-width: 10rem;"></Column>
           <Column field="year" header="Year" style="min-width: 10rem;"></Column>
           <Column field="usedPower" header="Total Used Power(kWh)" style="min-width: 10rem;"></Column>
-          <Column field="price" header="Old Balance($)" style="min-width: 10rem;"></Column>
-          <Column field="new" header="New Balance($)" style="min-width: 10rem;"></Column>
-          <Column field="unit" header="Unit Price($)" style="min-width: 10rem;"></Column>
+          <Column field="price" header="Old Balance(€)" style="min-width: 10rem;"></Column>
+          <Column field="new" header="New Balance(€)" style="min-width: 10rem;"></Column>
+          <Column field="unit" header="Unit Price(€)" style="min-width: 10rem;"></Column>
           <Column header="Actions">
             <template #body="slotProps">
               <Button v-if="slotProps.data.isArchive == false" icon="pi pi-download"  class="p-button-rounded p-button-success mr-2" @click="onDownload(slotProps.data)" />
@@ -35,7 +55,7 @@
       <InvoiceModal @close="closeForm" :tariffData="currentTariff" addEdit="Edit" />
     </Dialog>
     <Dialog header="Confirm Delete" v-model:visible="displayConfirmDeleteDialog" :modal="true" :closable="false" :style="{ width: '30vw' }">
-      <h2>Are you sure you want to delete this tariff?</h2>
+      <h2>Are you sure you want to delete this in?</h2>
       <template #footer>
         <Button label="Cancel" @click="displayConfirmDeleteDialog = false" class="p-button-text" />
         <Button label="Delete" @click="confirmDeleteTariff" class="p-button-danger" />
@@ -53,6 +73,7 @@ import InputText from 'primevue/inputtext';
 import Calendar from 'primevue/calendar';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
+import Dropdown from 'primevue/dropdown';
 import InvoiceModal from './InvoiceModal.vue';
 import { GetInvoices, DownloadBill, DeleteInvoices } from '../services/services.js';
 
@@ -66,6 +87,7 @@ export default {
     Dialog,
     InputText,
     Calendar,
+    Dropdown,
     InvoiceModal,
   },
   data() {
@@ -79,18 +101,12 @@ export default {
       selectedYear: null,
       selectedMonth: null,
       selectedEmail: '',
+      emailOptions: [],
     };
   },
   computed: {
-    uniqueTariffs() {
-      const seen = new Set();
-      return this.tariffs.filter(tariff => {
-        const identifier = `${tariff.year}-${tariff.month}`;
-        return !seen.has(identifier) && seen.add(identifier);
-      });
-    },
     filteredTariffs() {
-      return this.uniqueTariffs.filter(tariff => {
+      return this.tariffs.filter(tariff => {
         const yearMatch = !this.selectedYear || tariff.year === this.selectedYear.getFullYear();
         const monthMatch = !this.selectedMonth || tariff.month === this.selectedMonth.getMonth() + 1;
         const emailMatch = !this.selectedEmail || tariff.email.includes(this.selectedEmail);
@@ -113,19 +129,32 @@ export default {
       this.displayConfirmDeleteDialog = true;
     },
     async onDownload(tariff) {
-      // Get the logged user's id from localStorage
       const loguserId = localStorage.getItem('userID');
-      // Call DownloadBill with tariff info and loguserId
       await DownloadBill(tariff.userId, tariff.month, tariff.year, loguserId);
       console.log('Download button clicked', tariff);
     },
     async confirmDeleteTariff() {
-      console.log('Deleting tariff:', this.tariffToDelete);
-      await DeleteInvoices(this.tariffToDelete.userId, this.tariffToDelete.month, this.tariffToDelete.year);
-      this.displayConfirmDeleteDialog = false;
-      this.tariffToDelete = null;
+  try {
+    console.log('Deleting tariff:', this.tariffToDelete);
+    // Wait for DeleteInvoices to complete fully
+    const response = await DeleteInvoices(this.tariffToDelete.userId, this.tariffToDelete.month, this.tariffToDelete.year);
+    console.log('Delete response:', response);
+    
+    // Close the dialog
+    this.displayConfirmDeleteDialog = false;
+    this.tariffToDelete = null;
+    
+    // Add a small delay before fetching to ensure server has processed the deletion
+    setTimeout(() => {
       this.fetchInvoices();
-    },
+    }, 300);
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
+    // Show error to user if needed
+    this.displayConfirmDeleteDialog = false;
+    this.tariffToDelete = null;
+  }
+},
     async closeForm() {
       this.displayModal = false;
       this.displayModalEdit = false;
@@ -134,7 +163,7 @@ export default {
     },
     async fetchInvoices() {
       try {
-        const userId = localStorage.getItem('userID'); // Use userId from localStorage
+        const userId = localStorage.getItem('userID');
         const response = await GetInvoices(userId);
         if (response && response.data) {
           this.tariffs = response.data.map(device => ({
@@ -170,12 +199,27 @@ export default {
 
       // Populate emails
       const uniqueEmails = [...new Set(this.tariffs.map(t => t.email))];
-      this.emails = uniqueEmails.map(email => ({ name: email, value: email }));
+      this.emailOptions = [
+        { name: 'All', value: '' },
+        ...uniqueEmails.map(email => ({ name: email, value: email }))
+      ];
     },
     applyFilters() {
       // This method is called when a filter changes
       // The filtering is handled by the computed property 'filteredTariffs'
       console.log('Filters applied:', { year: this.selectedYear, month: this.selectedMonth, email: this.selectedEmail });
+    },
+    getRowClass(data) {
+      const currentDate = new Date();
+      const invoiceDate = new Date(data.year, data.month - 1);
+      const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
+      if (data.new === 0) {
+        return 'paid-row';
+      } else if (invoiceDate >= threeMonthsAgo) {
+        return 'recent-unpaid-row';
+      } else {
+        return 'overdue-row';
+      }
     },
   },
   mounted() {
@@ -278,5 +322,38 @@ export default {
 
 .p-autocomplete-loader {
   display: none !important;
+}
+.paid-row {
+  background-color: #2ecc40 !important; /* green */
+  color: #fff !important;
+}
+.recent-unpaid-row {
+  background-color: #ffe066 !important; /* yellow */
+  color: #333 !important;
+}
+.overdue-row {
+  background-color: #ff6f69 !important; /* red */
+  color: #fff !important;
+}
+.archived-row {
+  background-color: #f8d7da; /* Light red for archived rows */
+}
+
+.active-row {
+  background-color: #d4edda; /* Light green for active rows */
+}
+.filter-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 3px;
+  margin-top: 200px;
+}
+.filter-item {
+  min-width: 160px;
+  max-width: 220px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
 }
 </style>

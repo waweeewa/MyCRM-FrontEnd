@@ -199,26 +199,49 @@ export default {
                 let [label, dataArrayRaw] = chartPages.value[currentPage.value];
                 const dataArray = Array.isArray(dataArrayRaw) ? dataArrayRaw : [];
                 console.log('Updating chart page:', label, dataArray);
-                if (label == "null") {
+                
+                // Fix for "null" label - use the first year from the date range
+                if (label === "null" || label === null) {
                     label = selectedStartDate.value.getFullYear();
                 }
-                // For monthly mode, convert label to number and add currentPage.value properly.
-                const numericLabel = parseInt(label);
-                const displayYear = numericLabel + currentPage.value;
+                
+                // For monthly mode, convert label to number and add currentPage.value properly
+                const numericLabel = parseInt(label) || selectedStartDate.value.getFullYear();
+                const displayYear = isNaN(numericLabel) ? label : numericLabel + currentPage.value;
+                
                 let newYAxisTitle, newChartTitle;
+                
                 if (consumptionMode.value === 'yearly') {
-                    const roundedData = dataArray.map(val => parseFloat(val.toFixed(2)));
+                    // Handle yearly mode properly - especially for single value
+                    if (dataArray.length === 1 && years.value.length > 0) {
+                        // When we have a single yearly value but multiple years selected
+                        chartOptions.value.xaxis.categories = [selectedStartDate.value.getFullYear()];
+                    } else {
+                        // Normal yearly data with multiple years
+                        chartOptions.value.xaxis.categories = years.value.length > 0 ? 
+                            years.value : [selectedStartDate.value.getFullYear()];
+                    }
+                    
+                    const roundedData = dataArray.map(val => parseFloat(parseFloat(val).toFixed(2)));
+                    
+                    // Create a descriptive label for the year range
+                    const yearRangeLabel = selectedStartDate.value.getFullYear() === selectedEndDate.value.getFullYear() ?
+                        `${selectedStartDate.value.getFullYear()}` :
+                        `${selectedStartDate.value.getFullYear()}-${selectedEndDate.value.getFullYear()}`;
+                    
                     chartSeries.value = [{
                         name: chartMetric.value === 'price'
-                              ? `Price in: ${label}`
-                              : `Electricity Consumption in: ${label}`,
+                              ? `Price in: ${yearRangeLabel}`
+                              : `Electricity Consumption in: ${yearRangeLabel}`,
                         data: roundedData
                     }];
-                    newYAxisTitle = chartMetric.value === 'price' ? 'Price($)' : 'kW / h';
+                    
+                    newYAxisTitle = chartMetric.value === 'price' ? 'Price(€)' : 'kW / h';
                     newChartTitle = chartMetric.value === 'price'
-                          ? `Price in: ${label}`
-                          : `Electricity Consumption in: ${label}`;
+                          ? `Price in: ${yearRangeLabel}`
+                          : `Electricity Consumption in: ${yearRangeLabel}`;
                 } else {
+                    // Monthly mode handling
                     chartSeries.value = [{
                         name: chartMetric.value === 'price'
                               ? `Price in: ${displayYear}`
@@ -228,11 +251,13 @@ export default {
                     // Use month names instead of numerical data labels
                     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                     chartOptions.value.xaxis.categories = months.slice(0, dataArray.length);
-                    newYAxisTitle = chartMetric.value === 'price' ? 'Price($)' : 'kW / h';
+                    
+                    newYAxisTitle = chartMetric.value === 'price' ? 'Price(€)' : 'kW / h';
                     newChartTitle = chartMetric.value === 'price'
                           ? `Price in: ${displayYear}`
                           : `Electricity Consumption in: ${displayYear}`;
                 }
+                
                 // Reassign chartOptions.value so the nested updates are reactive
                 chartOptions.value = {
                     ...chartOptions.value,
@@ -261,13 +286,13 @@ export default {
             updateChartPage();
         };
 
+        // Add watchers that refetch data on mode/metric change:
         watch(consumptionMode, () => {
-            updateChartPage();
+            updateChartData();
         });
 
-        // Watch changes to the new metric selection
         watch(chartMetric, () => {
-            updateChartPage();
+            updateChartData();
         });
 
         // Add watch on calendars to update chart data when both dates are filled
